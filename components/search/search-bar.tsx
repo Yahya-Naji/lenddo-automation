@@ -26,17 +26,19 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
       onSubmit={handleSubmit}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
+      transition={{ duration: 0.5, delay: 0.1 }}
       className="w-full"
     >
-      <div className="rounded-3xl bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F7F7F8]">
+      <div className="rounded-2xl border border-[#E4E4E7] bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7F7F8]">
             <Sparkles className="h-5 w-5 text-[#121217]" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-[#121217]">AI-Powered Search</h2>
-            <p className="text-xs text-[#6C6C89]">Describe who you&apos;re looking for in plain English</p>
+            <p className="text-xs text-[#6C6C89]">
+              Describe who you&apos;re looking for in plain English
+            </p>
           </div>
         </div>
 
@@ -46,7 +48,7 @@ export function SearchBar({ onSearch, isLoading }: SearchBarProps) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder='e.g. "Find expats in finance who just moved to Dubai, earning 25K+ AED"'
             rows={3}
-            className="w-full resize-none rounded-2xl border border-[#E4E4E7] bg-[#F7F7F8] px-5 py-4 text-base text-[#121217] placeholder:text-[#A9A9BC] focus:border-[#121217] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#121217] transition-all duration-300"
+            className="w-full resize-none rounded-xl border border-[#E4E4E7] bg-[#F7F7F8] px-5 py-4 text-sm text-[#121217] placeholder:text-[#A9A9BC] focus:border-[#121217] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#121217] transition-all duration-300"
           />
         </div>
 
