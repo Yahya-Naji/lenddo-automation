@@ -1,23 +1,27 @@
 export async function POST(request: Request) {
-  const { queryString } = await request.json();
+  const { queryStrings } = await request.json();
 
-  if (!queryString) {
-    return Response.json({ error: "queryString is required" }, { status: 400 });
+  if (!queryStrings || !Array.isArray(queryStrings) || queryStrings.length === 0) {
+    return Response.json({ error: "queryStrings is required" }, { status: 400 });
   }
 
-  const makeRes = await fetch(process.env.MAKE_WEBHOOK_URL!, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ queryString }),
-  });
+  const results = await Promise.all(
+    queryStrings.map((queryString: string) =>
+      fetch(process.env.MAKE_WEBHOOK_URL!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queryString }),
+      })
+    )
+  );
 
-  if (!makeRes.ok) {
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length > 0) {
     return Response.json({ error: "Make webhook failed" }, { status: 500 });
   }
 
   return Response.json({
     success: true,
-    queryString,
-    message: "Search triggered. Results will appear in Airtable shortly.",
+    message: `${queryStrings.length} search${queryStrings.length > 1 ? "es" : ""} triggered. Results will appear in Airtable shortly.`,
   });
 }
