@@ -7,7 +7,7 @@ export async function POST(request: Request) {
 
   const results = await Promise.all(
     queryStrings.map((queryString: string) =>
-      fetch(process.env.MAKE_WEBHOOK_URL!, {
+      fetch(process.env.N8N_WEBHOOK_URL!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ queryString }),
