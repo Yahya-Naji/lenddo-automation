@@ -34,14 +34,13 @@ interface ManualFiltersProps {
 const PER_PAGE_PRESETS = ["10", "25", "50", "100"];
 
 const UAE_LOCATIONS = [
-  "United Arab Emirates",
-  "Dubai",
-  "Abu Dhabi",
-  "Sharjah",
-  "Ajman",
-  "Ras Al Khaimah",
-  "Fujairah",
-  "Al Ain",
+  "united arab emirates",
+  "dubai, united arab emirates",
+  "abu dhabi, united arab emirates",
+  "sharjah, united arab emirates",
+  "ajman, united arab emirates",
+  "ras al khaimah, united arab emirates",
+  "fujairah, united arab emirates",
 ];
 
 // ─── ApolloCombobox ──────────────────────────────────────────────────────────
