@@ -33,18 +33,38 @@ interface ManualFiltersProps {
 
 const PER_PAGE_PRESETS = ["10", "25", "50", "100"];
 
-const UAE_LOCATIONS = [
-  "united arab emirates",
-  "dubai, united arab emirates",
-  "abu dhabi, united arab emirates",
-  "sharjah, united arab emirates",
-  "ajman, united arab emirates",
-  "ras al khaimah, united arab emirates",
-  "fujairah, united arab emirates",
+const COMMON_TITLES = [
+  "CEO", "CFO", "COO", "CTO", "CMO", "CHRO", "CIO",
+  "Founder", "Co-Founder", "Owner", "President", "Chairman", "Board Member",
+  "Managing Director", "Executive Director", "General Manager", "Managing Partner",
+  "Partner", "Senior Partner", "Associate Partner",
+  "Director", "Senior Director", "Associate Director",
+  "Vice President", "Senior Vice President", "Executive Vice President",
+  "Principal", "Manager", "Senior Manager", "Head of",
 ];
 
-// ─── ApolloCombobox ──────────────────────────────────────────────────────────
-function ApolloCombobox({
+const UAE_LOCATIONS = [
+  "United Arab Emirates",
+  "Dubai",
+  "Abu Dhabi",
+  "Sharjah",
+  "Ajman",
+  "Ras Al Khaimah",
+  "Fujairah",
+];
+
+// Cities that map to contact_city; everything else is a country → contact_location
+const UAE_CITIES: Record<string, string> = {
+  "Dubai": "dubai",
+  "Abu Dhabi": "abu dhabi",
+  "Sharjah": "sharjah",
+  "Ajman": "ajman",
+  "Ras Al Khaimah": "ras al khaimah",
+  "Fujairah": "fujairah",
+};
+
+// ─── Combobox ─────────────────────────────────────────────────────────────────
+function Combobox({
   label,
   placeholder,
   options,
@@ -130,7 +150,7 @@ function ApolloCombobox({
       >
         <span className={cn("truncate", selected.length === 0 && "text-[#A9A9BC]")}>
           {isLoading
-            ? "Loading from Apollo..."
+            ? "Loading..."
             : selected.length > 0
             ? `${selected.length} selected`
             : placeholder}
@@ -170,11 +190,19 @@ function ApolloCombobox({
               </div>
             </div>
             <div className="max-h-52 overflow-y-auto p-1.5">
-              {filtered.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-[#A9A9BC]">
-                  {options.length === 0 ? "No data returned from Apollo" : "No matches found"}
-                </p>
-              ) : (
+              {filter.trim() && !options.includes(filter.trim()) && !selected.includes(filter.trim()) && (
+                <button
+                  type="button"
+                  onClick={() => { onChange([...selected, filter.trim()]); setFilter(""); }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#121217] hover:bg-[#F7F7F8]"
+                >
+                  <span className="text-[#6C6C89] text-xs">Add</span>
+                  <span className="font-medium">"{filter.trim()}"</span>
+                </button>
+              )}
+              {filtered.length === 0 && !filter.trim() ? (
+                <p className="px-3 py-4 text-center text-xs text-[#A9A9BC]">No matches found</p>
+              ) : filtered.length === 0 && filter.trim() ? null : (
                 filtered.map((option) => {
                   const isSelected = selected.includes(option);
                   return (
@@ -290,7 +318,6 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
   // Company search
   const [companyQuery, setCompanyQuery] = useState("");
   const [companySuggestions, setCompanySuggestions] = useState<Company[]>([]);
-  const [titlesPerCompany, setTitlesPerCompany] = useState<Record<string, string[]>>({});
   const [companyLoading, setCompanyLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [companyRows, setCompanyRows] = useState<CompanyRow[]>([]);
@@ -324,14 +351,13 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
   const fetchCompanies = async (query: string) => {
     setCompanyLoading(true);
     try {
-      const res = await fetch("/api/apollo/companies", {
+      const res = await fetch("/api/companies", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
       });
       const data = await res.json();
       setCompanySuggestions(data.companies || []);
-      setTitlesPerCompany((prev) => ({ ...prev, ...(data.titlesPerCompany || {}) }));
       setShowSuggestions(true);
     } catch {
       setCompanySuggestions([]);
@@ -380,16 +406,20 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
       .filter((r) => r.selectedTitles.length > 0)
       .map((r) => {
         const parts: string[] = [];
-        if (r.company.domain) {
-          parts.push(`q_organization_domains_list[]=${encodeURIComponent(r.company.domain)}`);
-        } else {
-          parts.push(`q_organization_name=${encodeURIComponent(r.company.name)}`);
-        }
+        parts.push(`q_organization_domains_list[]=${encodeURIComponent(r.company.domain)}`);
         for (const t of r.selectedTitles) {
           parts.push(`person_titles[]=${encodeURIComponent(t)}`);
         }
-        for (const l of selectedLocations) {
-          parts.push(`person_locations[]=${encodeURIComponent(l)}`);
+        const cities = selectedLocations.filter((l) => UAE_CITIES[l]);
+        const countries = selectedLocations.filter((l) => !UAE_CITIES[l]);
+        for (const l of cities) {
+          parts.push(`person_cities[]=${encodeURIComponent(UAE_CITIES[l])}`);
+        }
+        // Always include UAE as the country when cities are selected
+        const countrySet = new Set(countries.map((l) => l.toLowerCase()));
+        if (cities.length > 0) countrySet.add("united arab emirates");
+        for (const c of countrySet) {
+          parts.push(`person_locations[]=${encodeURIComponent(c)}`);
         }
         parts.push(`per_page=${encodeURIComponent(r.perPage)}`);
         return parts.join("&");
@@ -406,7 +436,6 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
     setCompanyRows([]);
     setCompanyQuery("");
     setCompanySuggestions([]);
-    setTitlesPerCompany({});
     setSelectedLocations([]);
   };
 
@@ -563,12 +592,12 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
               </div>
 
               {/* Per-company job titles */}
-              <ApolloCombobox
+              <Combobox
                 label="Job Titles"
-                placeholder="Select job titles from Apollo..."
-                options={titlesPerCompany[row.company.id] || []}
+                placeholder="Select or type a job title..."
+                options={COMMON_TITLES}
                 selected={row.selectedTitles}
-                onChange={(titles) => updateRowTitles(row.company.id, titles)}
+                onChange={(titles: string[]) => updateRowTitles(row.company.id, titles)}
                 isLoading={false}
               />
             </motion.div>
@@ -586,7 +615,7 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
               transition={{ duration: 0.2 }}
               className="space-y-4 pt-1"
             >
-              <ApolloCombobox
+              <Combobox
                 label="Location"
                 placeholder="Select UAE locations..."
                 options={UAE_LOCATIONS}

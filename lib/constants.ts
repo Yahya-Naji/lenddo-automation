@@ -16,4 +16,3 @@ export const QUICK_FILTERS = [
   },
 ] as const;
 
-export const SOURCES = ["Apollo", "LinkedIn", "Both"] as const;
