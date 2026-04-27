@@ -16,7 +16,7 @@ export default function Home() {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [iframeKey, setIframeKey] = useState(0);
 
-  const handleManualSearch = useCallback(async (queryStrings: string[]) => {
+  const handleManualSearch = useCallback(async (totalLeads: number, filters: { companyDomains: string[]; jobTitles: string[]; locations: string[]; cities: string[] }) => {
     setIsManualLoading(true);
     setResult(null);
 
@@ -24,7 +24,7 @@ export default function Home() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queryStrings }),
+        body: JSON.stringify({ totalLeads, filters }),
       });
 
       const data = await res.json();
