@@ -56,23 +56,30 @@ export async function POST(request: Request) {
   const totalLeadsRequested = companies.reduce((sum, c) => sum + c.perPage, 0);
 
   const fireWebhooks = async () => {
+    console.log("[search] N8N_WEBHOOK_URL:", process.env.N8N_WEBHOOK_URL);
+    console.log("[search] firing", totalWebhooks, "webhooks");
     await Promise.all(
-      webhooks.map((webhook, i) =>
-        fetch(process.env.N8N_WEBHOOK_URL!, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": process.env.N8N_WEBHOOK_SECRET ?? "",
-          },
-          body: JSON.stringify({
-            domain: webhook.domain,
-            perPage: webhook.perPage,
-            filters,
-            batchIndex: i,
-            totalBatches: totalWebhooks,
-          }),
-        }).catch(console.error)
-      )
+      webhooks.map(async (webhook, i) => {
+        try {
+          const res = await fetch(process.env.N8N_WEBHOOK_URL!, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": process.env.N8N_WEBHOOK_SECRET ?? "",
+            },
+            body: JSON.stringify({
+              domain: webhook.domain,
+              perPage: webhook.perPage,
+              filters,
+              batchIndex: i,
+              totalBatches: totalWebhooks,
+            }),
+          });
+          console.log(`[search] webhook ${i} response:`, res.status, await res.text());
+        } catch (err) {
+          console.error(`[search] webhook ${i} error:`, err);
+        }
+      })
     );
   };
 
@@ -82,6 +89,6 @@ export async function POST(request: Request) {
     status: "ok",
     totalLeadsRequested,
     totalWebhooks,
-    message: `${totalWebhooks} search${totalWebhooks > 1 ? "es" : ""} triggered (${totalLeadsRequested} total leads). Results will appear in Airtable shortly.`,
+    message: `${totalWebhooks} search${totalWebhooks > 1 ? "es" : ""} triggered (${totalLeadsRequested} total leads). Results will appear in Google Sheets shortly.`,
   });
 }
