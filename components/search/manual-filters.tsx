@@ -23,17 +23,17 @@ interface Company {
 interface CompanyRow {
   company: Company;
   selectedTitles: string[];
+  perPage: number;
 }
 
 interface SearchFilters {
-  companyDomains: string[];
   jobTitles: string[];
   locations: string[];
   cities: string[];
 }
 
 interface ManualFiltersProps {
-  onSubmit: (totalLeads: number, filters: SearchFilters) => Promise<void>;
+  onSubmit: (companies: { domain: string; perPage: number }[], filters: SearchFilters) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -296,13 +296,11 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
     }
   };
 
-  const [totalLeads, setTotalLeads] = useState<number>(25);
-
   const selectCompany = useCallback((company: Company) => {
     setCompanyRows((prev) =>
       prev.find((r) => r.company.id === company.id)
         ? prev
-        : [...prev, { company, selectedTitles: [] }]
+        : [...prev, { company, selectedTitles: [], perPage: 25 }]
     );
     setShowSuggestions(false);
     setCompanyQuery("");
@@ -319,17 +317,21 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
     );
   };
 
+  const updateRowPerPage = (companyId: string, value: number) => {
+    setCompanyRows((prev) =>
+      prev.map((r) => (r.company.id === companyId ? { ...r, perPage: value } : r))
+    );
+  };
+
   const isValid =
     companyRows.length > 0 &&
     companyRows.some((r) => r.selectedTitles.length > 0) &&
-    selectedLocations.length > 0 &&
-    totalLeads >= 1 &&
-    totalLeads <= 500;
+    selectedLocations.length > 0;
 
-  const buildFilters = () => {
-    const companyDomains = companyRows
+  const buildPayload = () => {
+    const companies = companyRows
       .filter((r) => r.selectedTitles.length > 0)
-      .map((r) => r.company.domain);
+      .map((r) => ({ domain: r.company.domain, perPage: r.perPage }));
 
     const jobTitles = [...new Set(companyRows.flatMap((r) => r.selectedTitles))];
 
@@ -340,17 +342,20 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
     if (cityList.length > 0) countrySet.add("united arab emirates");
 
     return {
-      companyDomains,
-      jobTitles,
-      locations: [...countrySet],
-      cities: cityList.map((l) => UAE_CITIES[l]),
+      companies,
+      filters: {
+        jobTitles,
+        locations: [...countrySet],
+        cities: cityList.map((l) => UAE_CITIES[l]),
+      },
     };
   };
 
   const handleSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault();
     if (!isValid || isLoading) return;
-    onSubmit(totalLeads, buildFilters());
+    const { companies, filters } = buildPayload();
+    onSubmit(companies, filters);
   };
 
   const handleClear = () => {
@@ -358,7 +363,6 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
     setCompanyQuery("");
     setCompanySuggestions([]);
     setSelectedLocations([]);
-    setTotalLeads(25);
   };
 
   return (
@@ -499,6 +503,16 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 rounded-lg border border-[#E4E4E7] bg-white px-2 py-1">
+                    <input
+                      type="number"
+                      min={1}
+                      value={row.perPage}
+                      onChange={(e) => updateRowPerPage(row.company.id, Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-12 bg-transparent text-center text-xs font-semibold text-[#121217] focus:outline-none"
+                    />
+                    <span className="text-xs text-[#A9A9BC]">leads</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeCompany(row.company.id)}
@@ -542,18 +556,7 @@ export function ManualFilters({ onSubmit, isLoading }: ManualFiltersProps) {
                 isLoading={false}
               />
 
-              <div className="flex items-end justify-between gap-4 pt-2">
-                <div>
-                  <p className="mb-1.5 text-xs font-medium text-[#6C6C89]">Total leads (max 500)</p>
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={totalLeads}
-                    onChange={(e) => setTotalLeads(Math.min(500, Math.max(1, parseInt(e.target.value) || 1)))}
-                    className="w-32 rounded-lg border border-[#E4E4E7] bg-[#F7F7F8] px-3 py-2 text-sm font-semibold text-[#121217] focus:border-[#121217] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#121217] transition-all duration-200"
-                  />
-                </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"

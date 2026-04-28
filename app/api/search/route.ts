@@ -1,83 +1,87 @@
 import { waitUntil } from "@vercel/functions";
 
-const BATCH_SIZE = 25;
+const MAX_LEADS_PER_WEBHOOK = 25;
+
+interface CompanyQuery {
+  domain: string;
+  perPage: number;
+}
 
 interface Filters {
-  companyDomains: string[];
   jobTitles: string[];
   locations: string[];
   cities: string[];
 }
 
+interface Webhook {
+  domain: string;
+  perPage: number;
+}
+
 export async function POST(request: Request) {
-  const { totalLeads, filters }: { totalLeads: number; filters: Filters } =
+  const { companies, filters }: { companies: CompanyQuery[]; filters: Filters } =
     await request.json();
 
-  if (!totalLeads || totalLeads < 1 || totalLeads > 500) {
+  if (!companies?.length) {
+    return Response.json({ error: "companies array is required" }, { status: 400 });
+  }
+  if (!filters?.jobTitles?.length || !filters?.locations?.length) {
     return Response.json(
-      { error: "totalLeads must be between 1 and 500" },
+      { error: "filters.jobTitles and locations are required" },
       { status: 400 }
     );
   }
-
-  if (
-    !filters?.companyDomains?.length ||
-    !filters?.jobTitles?.length ||
-    !filters?.locations?.length
-  ) {
-    return Response.json(
-      { error: "filters.companyDomains, jobTitles, and locations are required" },
-      { status: 400 }
-    );
+  for (const c of companies) {
+    if (!c.domain || c.perPage < 1) {
+      return Response.json(
+        { error: `Invalid entry for ${c.domain}` },
+        { status: 400 }
+      );
+    }
   }
 
-  const batchCount = Math.ceil(totalLeads / BATCH_SIZE);
+  // One company per webhook. If perPage > 25, split into chunks of 25.
+  // e.g. Mediclinic 60 → [25, 25, 10]
+  const webhooks: Webhook[] = [];
+  for (const company of companies) {
+    let remaining = company.perPage;
+    while (remaining > 0) {
+      const chunk = Math.min(remaining, MAX_LEADS_PER_WEBHOOK);
+      webhooks.push({ domain: company.domain, perPage: chunk });
+      remaining -= chunk;
+    }
+  }
 
-  const buildQueryString = (batchSize: number): string => {
-    const parts: string[] = [];
-    for (const domain of filters.companyDomains) {
-      parts.push(`q_organization_domains_list[]=${encodeURIComponent(domain)}`);
-    }
-    for (const title of filters.jobTitles) {
-      parts.push(`person_titles[]=${encodeURIComponent(title)}`);
-    }
-    for (const city of filters.cities ?? []) {
-      parts.push(`person_cities[]=${encodeURIComponent(city)}`);
-    }
-    for (const location of filters.locations) {
-      parts.push(`person_locations[]=${encodeURIComponent(location)}`);
-    }
-    parts.push(`per_page=${batchSize}`);
-    return parts.join("&");
-  };
+  const totalWebhooks = webhooks.length;
+  const totalLeadsRequested = companies.reduce((sum, c) => sum + c.perPage, 0);
 
   const fireWebhooks = async () => {
-    const batches = Array.from({ length: batchCount }, (_, i) => {
-      const isLast = i === batchCount - 1;
-      const batchSize = isLast ? totalLeads - i * BATCH_SIZE : BATCH_SIZE;
-      return fetch(process.env.N8N_WEBHOOK_URL!, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.N8N_WEBHOOK_SECRET ?? "",
-        },
-        body: JSON.stringify({
-          queryString: buildQueryString(batchSize),
-          batchIndex: i,
-          totalBatches: batchCount,
-        }),
-      }).catch(console.error);
-    });
-    await Promise.all(batches);
+    await Promise.all(
+      webhooks.map((webhook, i) =>
+        fetch(process.env.N8N_WEBHOOK_URL!, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.N8N_WEBHOOK_SECRET ?? "",
+          },
+          body: JSON.stringify({
+            domain: webhook.domain,
+            perPage: webhook.perPage,
+            filters,
+            batchIndex: i,
+            totalBatches: totalWebhooks,
+          }),
+        }).catch(console.error)
+      )
+    );
   };
 
   waitUntil(fireWebhooks());
 
   return Response.json({
     status: "ok",
-    totalRequested: totalLeads,
-    batchCount,
-    batchSize: BATCH_SIZE,
-    message: `${batchCount} search${batchCount > 1 ? "es" : ""} triggered (${totalLeads} total leads). Results will appear in Airtable shortly.`,
+    totalLeadsRequested,
+    totalWebhooks,
+    message: `${totalWebhooks} search${totalWebhooks > 1 ? "es" : ""} triggered (${totalLeadsRequested} total leads). Results will appear in Airtable shortly.`,
   });
 }
